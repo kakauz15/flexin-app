@@ -1,0 +1,52 @@
+Implemente no backend do projeto FlexIN um sistema completo de autenticação e gerenciamento de usuários, usando Node (API routes) e PostgreSQL. As funcionalidades obrigatórias são:
+
+1) LOGIN LOCAL  
+- Cadastro com e-mail e senha criptografada (bcrypt).  
+- Enviar e-mail de verificação após o cadastro.  
+- Só permitir login após confirmar e-mail.  
+- Suporte a “lembrar sessão” via refresh token.  
+- Suporte local a biometria apenas para desbloquear a sessão (não autenticação no servidor).  
+- Recuperação de senha: endpoint para solicitar reset; enviar senha temporária; no primeiro login exigir troca.
+
+2) LOGIN OAuth  
+- Implementar OAuth (Google, LinkedIn, Microsoft).  
+- Se o e-mail já existir → vincular e autenticar.  
+- Se não existir → criar conta automaticamente com oauth_provider + oauth_id.  
+- Contas OAuth não usam fluxo de “esqueci a senha”.
+
+3) USUÁRIOS  
+- Tabela com: id, name, email, password_hash nullable, oauth_provider enum, oauth_id nullable, email_verified_at, avatar_url, department_id, is_admin, timestamps.  
+- Endpoints: listar usuários, obter por id, atualizar (nome, email, dept, admin), deletar.  
+- Upload de avatar (salvar arquivo e gravar caminho avatar_url).
+
+4) DEPARTAMENTOS  
+- CRUD completo (name, description).  
+- Usuários pertencem a um department.  
+- Admin só gerencia usuários do próprio department.
+
+5) ADMIN  
+- Endpoints para admin listar usuários, promover/demover admin, atualizar e-mail e department.  
+- Todas as operações protegidas.
+
+6) EMAILS  
+- Implementar envio de e-mails para: verificação de conta, reset de senha, senha temporária.
+
+7) ENDPOINTS  
+Criar rotas REST:  
+- /api/auth/register  
+- /api/auth/login  
+- /api/auth/oauth/:provider  
+- /api/auth/verify/:token  
+- /api/auth/forgot-password  
+- /api/auth/reset-password  
+- /api/auth/refresh  
+- /api/users (CRUD)  
+- /api/users/avatar  
+- /api/departments (CRUD)
+
+8) SEEDERS  
+- Criar seed de usuários fictícios com senhas bcrypt.  
+- Criar departamentos iniciais.  
+- Criar um admin padrão.
+
+Implemente todas as tabelas, endpoints e seeders acima de forma funcional.
