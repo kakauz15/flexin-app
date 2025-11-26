@@ -3,8 +3,11 @@ import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
     schema: './backend/db/schema.ts',
     out: './drizzle',
-    dialect: 'sqlite',
+    dialect: 'mysql',
     dbCredentials: {
-        url: 'file:sqlite.db',
+        host: '127.0.0.1',
+        user: 'root',
+        password: 'root',
+        database: 'flexin',
     },
 });

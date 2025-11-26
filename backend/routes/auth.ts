@@ -17,7 +17,7 @@ app.post('/register', async (c) => {
         return c.json({ error: 'Missing required fields' }, 400);
     }
 
-    const existingUser = await db.select().from(users).where(eq(users.email, email)).get();
+    const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (existingUser) {
         return c.json({ error: 'User already exists' }, 409);
     }
@@ -27,24 +27,24 @@ app.post('/register', async (c) => {
     // Generate verification token (mock)
     const verificationToken = sign({ email }, JWT_SECRET, { expiresIn: '1h' });
 
-    const newUser = await db.insert(users).values({
+    const [result] = await db.insert(users).values({
         name,
         email,
         passwordHash,
         oauthProvider: 'local',
         // emailVerifiedAt: new Date(), // Uncomment to auto-verify for testing
-    }).returning().get();
+    });
 
     await sendVerificationEmail(email, verificationToken);
 
-    return c.json({ message: 'User registered. Please verify your email.', userId: newUser.id }, 201);
+    return c.json({ message: 'User registered. Please verify your email.', userId: result.insertId }, 201);
 });
 
 app.post('/login', async (c) => {
     const body = await c.req.json();
     const { email, password } = body;
 
-    const user = await db.select().from(users).where(eq(users.email, email)).get();
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (!user || !user.passwordHash) {
         return c.json({ error: 'Invalid credentials' }, 401);
@@ -68,7 +68,7 @@ app.get('/verify/:token', async (c) => {
     const token = c.req.param('token');
     try {
         const decoded = verify(token, JWT_SECRET) as { email: string };
-        const user = await db.select().from(users).where(eq(users.email, decoded.email)).get();
+        const [user] = await db.select().from(users).where(eq(users.email, decoded.email)).limit(1);
 
         if (!user) {
             return c.json({ error: 'User not found' }, 404);
@@ -86,7 +86,7 @@ app.post('/forgot-password', async (c) => {
     const body = await c.req.json();
     const { email } = body;
 
-    const user = await db.select().from(users).where(eq(users.email, email)).get();
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (user) {
         const resetToken = sign({ sub: user.id, purpose: 'reset_password' }, JWT_SECRET, { expiresIn: '1h' });
         await sendPasswordResetEmail(email, resetToken);
@@ -101,7 +101,7 @@ app.post('/reset-password', async (c) => {
     const { token, newPassword } = body;
 
     try {
-        const decoded = verify(token, JWT_SECRET) as { sub: number, purpose: string };
+        const decoded = verify(token, JWT_SECRET) as unknown as { sub: number, purpose: string };
         if (decoded.purpose !== 'reset_password') {
             throw new Error('Invalid token purpose');
         }

@@ -1,6 +1,12 @@
-import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { Database } from 'bun:sqlite';
+import { drizzle } from 'drizzle-orm/mysql2';
+import { createPool } from 'mysql2/promise';
 import * as schema from './schema';
 
-const sqlite = new Database('sqlite.db');
-export const db = drizzle(sqlite, { schema });
+const poolConnection = createPool({
+    host: '127.0.0.1',
+    user: 'root',
+    password: 'root',
+    database: 'flexin',
+});
+
+export const db = drizzle(poolConnection, { schema, mode: 'default' });

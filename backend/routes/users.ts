@@ -14,7 +14,7 @@ app.get('/', async (c) => {
 // Get user by id
 app.get('/:id', async (c) => {
     const id = Number(c.req.param('id'));
-    const user = await db.select().from(users).where(eq(users.id, id)).get();
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
 
     if (!user) {
         return c.json({ error: 'User not found' }, 404);
@@ -31,15 +31,16 @@ app.put('/:id', async (c) => {
     // Filter allowed fields
     const { name, departmentId, avatarUrl } = body;
 
-    const updatedUser = await db.update(users)
-        .set({ name, departmentId, avatarUrl, updatedAt: new Date() })
-        .where(eq(users.id, id))
-        .returning()
-        .get();
-
-    if (!updatedUser) {
+    const [existingUser] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!existingUser) {
         return c.json({ error: 'User not found' }, 404);
     }
+
+    await db.update(users)
+        .set({ name, departmentId, avatarUrl, updatedAt: new Date() })
+        .where(eq(users.id, id));
+
+    const [updatedUser] = await db.select().from(users).where(eq(users.id, id)).limit(1);
 
     return c.json(updatedUser);
 });
@@ -54,11 +55,13 @@ app.put('/avatar', async (c) => {
 app.delete('/:id', async (c) => {
     // TODO: Add admin check
     const id = Number(c.req.param('id'));
-    const deleted = await db.delete(users).where(eq(users.id, id)).returning().get();
 
-    if (!deleted) {
+    const [userToDelete] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!userToDelete) {
         return c.json({ error: 'User not found' }, 404);
     }
+
+    await db.delete(users).where(eq(users.id, id));
 
     return c.json({ message: 'User deleted' });
 });
