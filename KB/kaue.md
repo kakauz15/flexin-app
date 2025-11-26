@@ -42,28 +42,101 @@ Todos os usuários têm a senha: **`123456`**
 
 ---
 
-## 🚀 Comandos Úteis
+## 🚀 Como Executar o Projeto (Tutorial Completo)
 
-### Instalação
+### Pré-requisitos
+
+1. **MySQL** instalado e rodando
+2. **Node.js** (v18+) ou **Bun** instalado
+3. **Expo CLI** (instalado automaticamente com as dependências)
+
+### Passo 1: Configurar o Banco de Dados
 
 ```bash
-# Instalar dependências
+# 1. Inicie o MySQL (se não estiver rodando)
+# Windows:
+net start MySQL80
+
+# 2. Crie o banco de dados (apenas primeira vez)
+mysql -u root -p
+# No prompt do MySQL:
+CREATE DATABASE flexin;
+exit;
+```
+
+### Passo 2: Instalar Dependências
+
+```bash
+# Com npm
 npm install
-# ou
+
+# OU com bun (mais rápido)
 bun install
 ```
+
+### Passo 3: Configurar o Schema do Banco
+
+```bash
+# Aplicar o schema ao banco de dados
+npm run db:push
+```
+
+### Passo 4: Popular o Banco com Dados Mock
+
+```bash
+# Executar o seeder
+npm run db:seed
+```
+
+Isso criará:
+- 4 departamentos
+- 5 usuários (senha: `123456`)
+- 6 bookings
+- 2 swap requests
+- Configurações padrão
+
+### Passo 5: Iniciar o Backend
+
+```bash
+# Terminal 1 - Iniciar servidor backend
+npm run dev
+```
+
+O backend estará rodando em: `http://localhost:3000`
+
+### Passo 6: Iniciar o Frontend
+
+```bash
+# Terminal 2 - Iniciar Expo
+npm run expo
+
+# OU para web diretamente
+npm run web
+```
+
+### 🎉 Pronto!
+
+Agora você tem:
+- ✅ Backend rodando na porta 3000
+- ✅ Frontend Expo rodando
+- ✅ Banco de dados populado com dados de teste
+
+---
+
+## 📋 Comandos Disponíveis
 
 ### Desenvolvimento
 
 ```bash
-# Iniciar o projeto (mobile)
-npm start
+# Iniciar backend (Hono + tRPC)
+npm run dev
+npm run backend        # Alias para 'dev'
 
-# Iniciar com web
-npm run start-web
-
-# Iniciar web com debug
-npm run start-web-dev
+# Iniciar frontend Expo
+npm run expo           # Menu interativo
+npm run web            # Web diretamente
+npm run android        # Android diretamente
+npm run ios            # iOS diretamente
 
 # Lint
 npm run lint
@@ -73,16 +146,46 @@ npm run lint
 
 ```bash
 # Aplicar mudanças no schema ao banco
-npx drizzle-kit push
+npm run db:push
 
-# Gerar migrations
-npx drizzle-kit generate
+# Gerar migrations (para produção)
+npm run db:generate
 
-# Executar seeder (popular banco com dados mock)
-npx tsx backend/db/seed.ts
+# Popular banco com dados mock
+npm run db:seed
 
 # Abrir Drizzle Studio (visualizar banco)
-npx drizzle-kit studio
+npm run db:studio
+```
+
+---
+
+## 🔄 Workflow Diário de Desenvolvimento
+
+### Início do Dia
+
+```bash
+# 1. Verificar se MySQL está rodando
+# 2. Abrir 2 terminais
+
+# Terminal 1 - Backend
+npm run dev
+
+# Terminal 2 - Frontend
+npm run expo
+```
+
+### Fazer Login no App
+
+Use qualquer um dos usuários de teste:
+- **Email:** `ana.silva@company.com`
+- **Senha:** `123456`
+
+### Resetar Banco de Dados
+
+```bash
+# Se precisar limpar e repopular o banco
+npm run db:seed
 ```
 
 ---
