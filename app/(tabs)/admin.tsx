@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -48,7 +48,7 @@ export default function AdminPanelScreen() {
     getUserStats,
     bookings,
   } = useFlexIN();
-  
+
   const { showToast } = useToast();
 
   const [maxCapacity, setMaxCapacity] = useState(String(settings.maxBookingsPerDay));
@@ -146,7 +146,7 @@ export default function AdminPanelScreen() {
 
   const handleBlockDate = async () => {
     const dateStr = format(selectedDateToBlock, 'yyyy-MM-dd');
-    
+
     if (settings.blockedDates.includes(dateStr)) {
       showToast({
         message: 'Esta data já está bloqueada',
@@ -177,20 +177,27 @@ export default function AdminPanelScreen() {
     if (date) {
       setSelectedDateToBlock(date);
       if (Platform.OS === 'ios') {
-        
+
       }
     }
   };
 
   const handleUnblockDate = async (date: string) => {
-    const success = await unblockDate(date);
+    const success = await unblockDate(date)
+    const dateStr = format(date, 'yyyy-MM-dd');
     if (success) {
       showToast({
-        message: `Data ${date} desbloqueada!`,
+        message: `Data ${format(dateStr, "d 'de' MMMM 'de' yyyy", { locale: ptBR })} bloqueada!`,
         type: 'success',
+      });
+    } else {
+      showToast({
+        message: 'Não foi possível desbloquear a data',
+        type: 'error',
       });
     }
   };
+
 
   const handleSetAnnouncement = async () => {
     if (!announcementText.trim()) {
@@ -237,15 +244,15 @@ export default function AdminPanelScreen() {
     const today = new Date();
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - today.getDay() + 1);
-    
+
     const currentWeekBookings = bookings.filter((b) => {
       if (b.userId !== selectedUserStats) return false;
       if (b.status !== 'confirmed') return false;
-      
-      const bookingDate = new Date(b.date);
+
+      const bookingDate = parseISO(b.date);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 7);
-      
+
       return bookingDate >= weekStart && bookingDate < weekEnd;
     });
 
@@ -411,7 +418,7 @@ export default function AdminPanelScreen() {
                       <Avatar name={user.name} imageUrl={user.avatar} size="sm" />
                       <View style={styles.pendingInfo}>
                         <Text style={styles.pendingName}>{user.name}</Text>
-                        <Text style={styles.pendingDate}>{format(new Date(booking.date), "d 'de' MMMM", { locale: ptBR })}</Text>
+                        <Text style={styles.pendingDate}>{format(parseISO(booking.date), "d 'de' MMMM", { locale: ptBR })}</Text>
                       </View>
                     </View>
                     <View style={styles.pendingActions}>
@@ -495,7 +502,7 @@ export default function AdminPanelScreen() {
                   <View key={`blocked-date-${date}-${index}`} style={styles.blockedDateItem}>
                     <View style={styles.blockedDateInfo}>
                       <Lock size={16} color={theme.colors.error} />
-                      <Text style={styles.blockedDateText}>{format(new Date(date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}</Text>
+                      <Text style={styles.blockedDateText}>{format(parseISO(date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}</Text>
                     </View>
                     <TouchableOpacity onPress={() => handleUnblockDate(date)} style={styles.unlockButton}>
                       <Unlock size={18} color={theme.colors.success} />

@@ -1,11 +1,16 @@
-import { Tabs } from 'expo-router';
-import { Calendar, ArrowLeftRight, BarChart3, User, ShieldCheck } from 'lucide-react-native';
+import { Tabs, Redirect } from 'expo-router';
+import { Calendar, ArrowLeftRight, BarChart3, User, Shield } from 'lucide-react-native';
 import React from 'react';
 import { theme } from '@/constants/theme';
 import { useFlexIN } from '@/context/FlexINContext';
 
 export default function TabLayout() {
   const { currentUser } = useFlexIN();
+
+  // Redirect to login if not authenticated
+  if (!currentUser) {
+    return <Redirect href="/auth" />;
+  }
 
   return (
     <Tabs
@@ -59,7 +64,7 @@ export default function TabLayout() {
           name="admin"
           options={{
             title: 'Admin',
-            tabBarIcon: ({ color, size }) => <ShieldCheck color={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
           }}
         />
       ) : null}

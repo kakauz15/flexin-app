@@ -1,5 +1,9 @@
 {
   "expo": {
+    "updates": {
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
+    },
     "name": "FlexIN Scheduler",
     "slug": "flexin-scheduler",
     "version": "1.0.0",

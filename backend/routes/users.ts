@@ -1,20 +1,49 @@
 import { Hono } from 'hono';
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, departments } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 const app = new Hono();
 
 // List users
 app.get('/', async (c) => {
-    const allUsers = await db.select().from(users);
+    const allUsers = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            avatarUrl: users.avatarUrl,
+            isAdmin: users.isAdmin,
+            departmentId: users.departmentId,
+            departmentName: departments.name,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt,
+        })
+        .from(users)
+        .leftJoin(departments, eq(users.departmentId, departments.id));
+
     return c.json(allUsers);
 });
 
 // Get user by id
 app.get('/:id', async (c) => {
     const id = Number(c.req.param('id'));
-    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const [user] = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            avatarUrl: users.avatarUrl,
+            isAdmin: users.isAdmin,
+            departmentId: users.departmentId,
+            departmentName: departments.name,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt,
+        })
+        .from(users)
+        .leftJoin(departments, eq(users.departmentId, departments.id))
+        .where(eq(users.id, id))
+        .limit(1);
 
     if (!user) {
         return c.json({ error: 'User not found' }, 404);

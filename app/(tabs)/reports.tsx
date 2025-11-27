@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Stack } from 'expo-router';
-import { startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, format, setMonth, setYear } from 'date-fns';
+import { startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, format, setMonth, setYear, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, Home, Building2, TrendingUp, ArrowLeftRight, Clock, CheckCircle } from 'lucide-react-native';
 import { Card } from '@/components/Card';
@@ -17,7 +17,7 @@ export default function ReportScreen() {
   let currentMonth = new Date();
   currentMonth = setMonth(currentMonth, selectedMonth);
   currentMonth = setYear(currentMonth, selectedYear);
-  
+
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -25,12 +25,12 @@ export default function ReportScreen() {
 
   const userBookings = getUserBookings(currentUser?.id || '');
   const monthBookings = userBookings.filter((b) => {
-    const bookingDate = new Date(b.date);
+    const bookingDate = parseISO(b.date);
     return bookingDate >= monthStart && bookingDate <= monthEnd && b.status === 'confirmed';
   });
-  
+
   const pendingBookings = userBookings.filter((b) => {
-    const bookingDate = new Date(b.date);
+    const bookingDate = parseISO(b.date);
     return bookingDate >= monthStart && bookingDate <= monthEnd && b.status === 'pending';
   });
 
@@ -85,7 +85,7 @@ export default function ReportScreen() {
                 </Picker>
               </View>
             </View>
-            
+
             <View style={styles.pickerWrapper}>
               <Text style={styles.pickerLabel}>Ano</Text>
               <View style={styles.pickerBorder}>
@@ -152,7 +152,7 @@ export default function ReportScreen() {
               <ArrowLeftRight size={20} color={theme.colors.primary} />
               <Text style={styles.swapsTitle}>Histórico de Trocas</Text>
             </View>
-            
+
             <View style={styles.swapsStats}>
               <View style={styles.swapsStat}>
                 <Text style={styles.swapsStatValue}>{userStats.swapsRequested}</Text>

@@ -30,7 +30,7 @@ export default function BookingScreen() {
     setCurrentWeekStart(addDays(currentWeekStart, 7));
   };
 
-  const handleDayPress = (date: Date) => {
+  const handleDayPress = async (date: Date) => {
     if (!currentUser) {
       console.log('Usuário não autenticado');
       return;
@@ -48,8 +48,8 @@ export default function BookingScreen() {
     }
 
     const dayCapacity = getDayCapacity(date);
-    const userBooking = dayCapacity.bookings.find((b) => b.userId === currentUser.id);
-    
+    const userBooking = dayCapacity.bookings.find((b) => String(b.userId) === String(currentUser.id));
+
     console.log('handleDayPress:', {
       date: dateStr,
       userId: currentUser.id,
@@ -74,7 +74,17 @@ export default function BookingScreen() {
       }
     } else {
       console.log('Criando nova booking para:', dateStr);
-      const result = createBooking(date);
+      console.log('Day capacity:', dayCapacity);
+
+      // Check if day is full BEFORE attempting to create booking
+      if (dayCapacity.available === 0 && dayCapacity.bookings.length > 0) {
+        console.log('Dia cheio, abrindo modal de troca');
+        setSelectedDate(date);
+        setShowSwapModal(true);
+        return;
+      }
+
+      const result = await createBooking(date);
       console.log('Resultado da criação:', result);
       if (result.success) {
         showToast({
@@ -82,6 +92,7 @@ export default function BookingScreen() {
           type: result.message ? 'info' : 'success',
         });
       } else {
+        // If creation failed and day is full, offer swap
         if (dayCapacity.available === 0 && dayCapacity.bookings.length > 0) {
           setSelectedDate(date);
           setShowSwapModal(true);
@@ -95,12 +106,12 @@ export default function BookingScreen() {
     }
   };
 
-  const handleSwapRequest = () => {
+  const handleSwapRequest = async () => {
     if (!currentUser || !selectedDate || !selectedTargetUserId) return;
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const success = createSwapRequest(selectedTargetUserId, dateStr, dateStr, swapJustification);
-    
+    const success = await createSwapRequest(selectedTargetUserId, dateStr, dateStr, swapJustification);
+
     if (success) {
       showToast({
         message: 'Solicitação de troca enviada com sucesso!',
@@ -130,8 +141,8 @@ export default function BookingScreen() {
     const isBlocked = settings.blockedDates.includes(dateStr);
     const dayCapacity = getDayCapacity(date);
     const isToday = isSameDay(date, startOfToday());
-    const userHasBooking = dayCapacity.bookings.some((b) => b.userId === currentUser?.id);
-    const bookedUsers = dayCapacity.bookings.map((b) => users.find((u) => u.id === b.userId)).filter(Boolean);
+    const userHasBooking = dayCapacity.bookings.some((b) => String(b.userId) === String(currentUser?.id));
+    const bookedUsers = dayCapacity.bookings.map((b) => users.find((u) => String(u.id) === String(b.userId))).filter(Boolean);
 
     const capacityPercentage = (dayCapacity.bookings.length / dayCapacity.capacity) * 100;
     const isFull = dayCapacity.available === 0;
@@ -206,9 +217,37 @@ export default function BookingScreen() {
     if (!selectedDate) return null;
 
     const dayCapacity = getDayCapacity(selectedDate);
+    console.log('=== SWAP MODAL DEBUG ===');
+    console.log('Selected date:', selectedDate);
+    console.log('Day capacity:', dayCapacity);
+    console.log('Total users in context:', users.length);
+    console.log('Users:', users.map(u => ({ id: u.id, name: u.name })));
+    console.log('Current user:', currentUser);
+
     const bookedUsers = dayCapacity.bookings
-      .map((b) => users.find((u) => u.id === b.userId))
-      .filter((u) => u && u.id !== currentUser?.id);
+      .map((b) => {
+        console.log('Booking object:', b);
+        console.log(`Looking for user with ID ${b.userId} (type: ${typeof b.userId})`);
+        const user = users.find((u) => {
+          const match = String(u.id) === String(b.userId);
+          console.log(`  Comparing ${u.id} (${typeof u.id}) with ${b.userId} (${typeof b.userId}): ${match}`);
+          return match;
+        });
+        console.log(`  Found user:`, user);
+        return user;
+      })
+      .filter((u) => {
+        if (!u) {
+          console.log('  Filtered out: undefined user');
+          return false;
+        }
+        const isCurrentUser = String(u.id) === String(currentUser?.id);
+        console.log(`  User ${u.name} is current user: ${isCurrentUser}`);
+        return !isCurrentUser;
+      });
+
+    console.log('Final bookedUsers:', bookedUsers);
+    console.log('=== END DEBUG ===');
 
     return (
       <Modal visible={showSwapModal} animationType="slide" transparent onRequestClose={handleCloseSwapModal}>
@@ -228,28 +267,32 @@ export default function BookingScreen() {
             <Text style={styles.swapModalLabel}>Escolha com quem deseja trocar:</Text>
 
             <ScrollView style={styles.userList} showsVerticalScrollIndicator={false}>
-              {bookedUsers.map((user) => {
-                if (!user) return null;
-                const isSelected = selectedTargetUserId === user.id;
-                return (
-                  <TouchableOpacity
-                    key={user.id}
-                    onPress={() => setSelectedTargetUserId(user.id)}
-                    style={[styles.userItem, isSelected && styles.userItemSelected]}
-                  >
-                    <Avatar name={user.name} imageUrl={user.avatar} size="md" />
-                    <View style={styles.userItemInfo}>
-                      <Text style={styles.userItemName}>{user.name}</Text>
-                      <Text style={styles.userItemDept}>{user.department}</Text>
-                    </View>
-                    {isSelected && (
-                      <View style={styles.selectedIndicator}>
-                        <Text style={styles.selectedIndicatorText}>✓</Text>
+              {bookedUsers.length === 0 ? (
+                <Text style={styles.emptyText}>Nenhum usuário disponível para troca neste dia.</Text>
+              ) : (
+                bookedUsers.map((user) => {
+                  if (!user) return null;
+                  const isSelected = selectedTargetUserId === user.id;
+                  return (
+                    <TouchableOpacity
+                      key={user.id}
+                      onPress={() => setSelectedTargetUserId(user.id)}
+                      style={[styles.userItem, isSelected && styles.userItemSelected]}
+                    >
+                      <Avatar name={user.name} imageUrl={user.avatar} size="md" />
+                      <View style={styles.userItemInfo}>
+                        <Text style={styles.userItemName}>{user.name}</Text>
+                        <Text style={styles.userItemDept}>{user.department}</Text>
                       </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+                      {isSelected && (
+                        <View style={styles.selectedIndicator}>
+                          <Text style={styles.selectedIndicatorText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </ScrollView>
 
             <Text style={styles.swapModalLabel}>Justificativa (opcional):</Text>
@@ -609,5 +652,11 @@ const styles = StyleSheet.create({
     minHeight: 80,
     marginBottom: theme.spacing.lg,
     textAlignVertical: 'top',
+  },
+  emptyText: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    padding: theme.spacing.xl,
   },
 });

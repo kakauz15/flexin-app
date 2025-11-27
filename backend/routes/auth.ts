@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, departments } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { compare, hash } from 'bcryptjs';
 import { sign, verify } from 'jsonwebtoken';
@@ -44,24 +44,49 @@ app.post('/login', async (c) => {
     const body = await c.req.json();
     const { email, password } = body;
 
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const [result] = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            passwordHash: users.passwordHash,
+            emailVerifiedAt: users.emailVerifiedAt,
+            avatarUrl: users.avatarUrl,
+            isAdmin: users.isAdmin,
+            departmentId: users.departmentId,
+            departmentName: departments.name,
+        })
+        .from(users)
+        .leftJoin(departments, eq(users.departmentId, departments.id))
+        .where(eq(users.email, email))
+        .limit(1);
 
-    if (!user || !user.passwordHash) {
+    if (!result || !result.passwordHash) {
         return c.json({ error: 'Invalid credentials' }, 401);
     }
 
-    const validPassword = await compare(password, user.passwordHash);
+    const validPassword = await compare(password, result.passwordHash);
     if (!validPassword) {
         return c.json({ error: 'Invalid credentials' }, 401);
     }
 
-    if (!user.emailVerifiedAt) {
+    if (!result.emailVerifiedAt) {
         return c.json({ error: 'Email not verified' }, 403);
     }
 
-    const token = sign({ sub: user.id, email: user.email, role: user.isAdmin ? 'admin' : 'user' }, JWT_SECRET, { expiresIn: '7d' });
+    const token = sign({ sub: result.id, email: result.email, role: result.isAdmin ? 'admin' : 'user' }, JWT_SECRET, { expiresIn: '7d' });
 
-    return c.json({ token, user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl } });
+    return c.json({
+        token,
+        user: {
+            id: result.id,
+            name: result.name,
+            email: result.email,
+            avatarUrl: result.avatarUrl,
+            isAdmin: result.isAdmin,
+            departmentName: result.departmentName
+        }
+    });
 });
 
 app.get('/verify/:token', async (c) => {

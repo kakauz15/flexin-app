@@ -73,7 +73,6 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
   }, []);
 
   const logout = useCallback(() => {
-    console.log('Logout called');
     setCurrentUser(null);
   }, []);
 
@@ -102,15 +101,18 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
         if (String(b.userId) !== String(userId)) return false;
         if (b.status !== 'confirmed') return false;
 
-        const bookingDate = new Date(b.date);
+        const bookingDate = new Date(b.date.split('T')[0]); // Normalize date
         return bookingDate >= weekStart && bookingDate < weekEnd;
       }).length;
     },
     [bookings]
   );
 
+  /**
+   * CREATE BOOKING - (corrigido)
+   */
   const createBooking = useCallback(
-    (date: Date): { success: boolean; message?: string } => {
+    async (date: Date): Promise<{ success: boolean; message?: string }> => {
       if (!currentUser) return { success: false, message: 'Usuário não autenticado' };
 
       const dateStr = format(date, 'yyyy-MM-dd');
@@ -119,9 +121,16 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
         return { success: false, message: 'Este dia está bloqueado pelo administrador' };
       }
 
-      const dayBookings = bookings.filter(
-        (b) => b.date === dateStr && (b.status === 'confirmed' || b.status === 'pending')
-      );
+      const dayBookings = bookings.filter((b) => {
+        const bookingDateStr = b.date.split('T')[0];
+        return bookingDateStr === dateStr && (b.status === 'confirmed' || b.status === 'pending');
+      });
+
+      console.log(`createBooking validation for ${dateStr}:`, {
+        dayBookings: dayBookings.length,
+        maxBookingsPerDay: settings.maxBookingsPerDay,
+        willBlock: dayBookings.length >= settings.maxBookingsPerDay,
+      });
 
       if (dayBookings.length >= settings.maxBookingsPerDay) {
         return { success: false, message: 'Dia cheio. Solicite uma troca com um colega.' };
@@ -145,415 +154,437 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
         }
       }
 
-      const newBooking: Booking = {
-        id: `b${Date.now()}`,
-        userId: currentUser.id,
-    (bookingId: string): boolean => {
-  if (!currentUser) return false;
+      try {
+        const response = await apiService.createBooking({
+          userId: currentUser.id,
+          date: dateStr,
+          status: settings.requireApprovalForBookings ? 'pending' : 'confirmed',
+        });
 
-  let success = false;
-  setBookings((prevBookings) => {
-    const booking = prevBookings.find((b) => b.id === bookingId);
-    if (!booking) {
-      console.log('Booking não encontrada:', bookingId);
-      return prevBookings;
-    }
+        const newBooking: Booking = {
+          id: String(response.id),
+          userId: currentUser.id,
+          date: dateStr,
+          status: settings.requireApprovalForBookings ? 'pending' : 'confirmed',
+          createdAt: new Date().toISOString(),
+        };
 
-    if (String(booking.userId) !== String(currentUser.id) && !currentUser.isAdmin) {
-      console.log('Usuário não autorizado a cancelar esta booking');
-      return prevBookings;
-    }
-
-    console.log('Cancelando booking:', bookingId);
-    apiService.cancelBooking(bookingId).catch(err => console.error(err));
-    success = true;
-    return prevBookings.filter((b) => b.id !== bookingId);
-  });
-  return success;
-},
-[currentUser]
+        setBookings((prev) => [...prev, newBooking]);
+        return { success: true };
+      } catch (error) {
+        console.error('Erro ao criar booking:', error);
+        return { success: false, message: 'Erro ao criar marcação' };
+      }
+    },
+    [currentUser, bookings, settings, getUserWeekBookingsCount]
   );
 
-const createSwapRequest = useCallback(
-  (targetUserId: string, requesterDate: string, targetDate: string, message?: string): boolean => {
-    if (!currentUser) return false;
+  /**
+   * CANCEL BOOKING (função correta)
+   */
+  const cancelBooking = useCallback(
+    (bookingId: string): boolean => {
+      if (!currentUser) return false;
 
-    const newSwapRequest: SwapRequest = {
-      id: `s${Date.now()}`,
-      requesterId: currentUser.id,
-      targetUserId,
-      requesterDate,
-      targetDate,
-      status: 'pending',
-      message,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+      let success = false;
 
-    apiService.createSwapRequest(newSwapRequest).catch(err => console.error(err));
-    setSwapRequests([...swapRequests, newSwapRequest]);
-    return true;
-  },
-  [currentUser, swapRequests]
-);
+      setBookings((prevBookings) => {
+        const booking = prevBookings.find((b) => b.id === bookingId);
+        if (!booking) return prevBookings;
 
-const cancelSwapRequest = useCallback(
-  (requestId: string): boolean => {
-    if (!currentUser) {
-      console.log('Usuário não autenticado');
-      return false;
-    }
+        if (String(booking.userId) !== String(currentUser.id) && !currentUser.isAdmin) {
+          return prevBookings;
+        }
 
-    let success = false;
+        apiService.cancelBooking(bookingId).catch(err => console.error(err));
+        success = true;
+        return prevBookings.filter((b) => b.id !== bookingId);
+      });
 
-    setSwapRequests((prevRequests) => {
-      const request = prevRequests.find((r) => r.id === requestId);
-      if (!request) {
-        console.log('Solicitação não encontrada:', requestId);
-        return prevRequests;
+      return success;
+    },
+    [currentUser]
+  );
+
+  /**
+   * CREATE SWAP REQUEST
+   */
+  const createSwapRequest = useCallback(
+    async (targetUserId: string, requesterDate: string, targetDate: string, message?: string): Promise<boolean> => {
+      if (!currentUser) return false;
+
+      try {
+        const response = await apiService.createSwapRequest({
+          requesterId: currentUser.id,
+          targetUserId,
+          requesterDate,
+          targetDate,
+          status: 'pending',
+          message,
+        });
+
+        const newSwapRequest: SwapRequest = {
+          id: String(response.id),
+          requesterId: currentUser.id,
+          targetUserId,
+          requesterDate,
+          targetDate,
+          status: 'pending',
+          message,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        setSwapRequests((prev) => [...prev, newSwapRequest]);
+        return true;
+      } catch (error) {
+        console.error('Erro ao criar solicitação de troca:', error);
+        return false;
       }
+    },
+    [currentUser]
+  );
 
-      if (String(request.requesterId) !== String(currentUser.id)) {
-        console.log('Usuário não autorizado a cancelar esta solicitação');
-        return prevRequests;
-      }
+  const cancelSwapRequest = useCallback(
+    (requestId: string): boolean => {
+      if (!currentUser) return false;
 
-      console.log('Cancelando solicitação:', requestId);
-      success = true;
-      return prevRequests.filter((r) => r.id !== requestId);
-    });
+      let success = false;
 
-    apiService.cancelSwapRequest(requestId).catch(err => console.error(err));
-    console.log('Solicitação cancelada com sucesso:', success);
-    return success;
-  },
-  [currentUser]
-);
+      setSwapRequests((prevRequests) => {
+        const request = prevRequests.find((r) => r.id === requestId);
+        if (!request) return prevRequests;
 
-const respondToSwapRequest = useCallback(
-  (requestId: string, approve: boolean): boolean => {
-    if (!currentUser) {
-      console.log('Usuário não autenticado');
-      return false;
-    }
+        if (String(request.requesterId) !== String(currentUser.id)) {
+          return prevRequests;
+        }
 
-    let success = false;
+        success = true;
+        return prevRequests.filter((r) => r.id !== requestId);
+      });
 
-    setSwapRequests((prevRequests) => {
-      const request = prevRequests.find((r) => r.id === requestId);
-      if (!request) {
-        console.log('Solicitação não encontrada:', requestId);
-        return prevRequests;
-      }
+      apiService.cancelSwapRequest(requestId).catch(err => console.error(err));
+      return success;
+    },
+    [currentUser]
+  );
 
-      if (String(request.targetUserId) !== String(currentUser.id)) {
-        console.log('Usuário não autorizado a responder esta solicitação');
-        return prevRequests;
-      }
+  const respondToSwapRequest = useCallback(
+    (requestId: string, approve: boolean): boolean => {
+      if (!currentUser) return false;
 
-      console.log('Respondendo à solicitação:', requestId, 'Aprovar:', approve);
-      success = true;
+      let success = false;
 
-      if (approve) {
-        setBookings((prevBookings) => {
-          const requesterBooking = prevBookings.find(
-            (b) => String(b.userId) === String(request.requesterId) && b.date === request.requesterDate
-          );
-          const targetBooking = prevBookings.find(
-            (b) => String(b.userId) === String(request.targetUserId) && b.date === request.targetDate
-          );
+      setSwapRequests((prevRequests) => {
+        const request = prevRequests.find((r) => r.id === requestId);
+        if (!request) return prevRequests;
 
-          if (requesterBooking && targetBooking) {
-            console.log('Trocando bookings:', requesterBooking.id, targetBooking.id);
+        if (String(request.targetUserId) !== String(currentUser.id)) {
+          return prevRequests;
+        }
+
+        success = true;
+
+        if (approve) {
+          setBookings((prevBookings) => {
+            const requesterBooking = prevBookings.find(
+              (b) => String(b.userId) === String(request.requesterId) && b.date === request.requesterDate
+            );
+            const targetBooking = prevBookings.find(
+              (b) => String(b.userId) === String(request.targetUserId) && b.date === request.targetDate
+            );
+
+            if (!requesterBooking || !targetBooking) return prevBookings;
+
             return prevBookings.map((b) => {
-              if (b.id === requesterBooking.id) {
+              if (b.id === requesterBooking.id)
                 return { ...b, date: request.targetDate };
-              }
-              if (b.id === targetBooking.id) {
+              if (b.id === targetBooking.id)
                 return { ...b, date: request.requesterDate };
-              }
               return b;
             });
-          } else {
-            console.log('Bookings não encontradas para troca');
-            return prevBookings;
-          }
-        });
-      }
+          });
+        }
 
-      return prevRequests.map((r) =>
-        r.id === requestId
-          ? {
-            ...r,
-            status: approve ? ('approved' as const) : ('rejected' as const),
-            updatedAt: new Date().toISOString(),
-          }
-          : r
-      );
-    });
+        return prevRequests.map((r) =>
+          r.id === requestId
+            ? {
+              ...r,
+              status: approve ? 'approved' : 'rejected',
+              updatedAt: new Date().toISOString(),
+            }
+            : r
+        );
+      });
 
-    apiService.respondToSwapRequest(requestId, approve).catch(err => console.error(err));
-    console.log('Solicitação respondida com sucesso:', success);
-    return success;
-  },
-  [currentUser]
-);
-
-const getDayCapacity = useCallback(
-  (date: Date): DayCapacity => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const dayBookings = bookings.filter((b) => b.date === dateStr && (b.status === 'confirmed' || b.status === 'pending'));
-
-    return {
-      date: dateStr,
-      bookings: dayBookings,
-      capacity: settings.maxBookingsPerDay,
-      available: settings.maxBookingsPerDay - dayBookings.length,
-    };
-  },
-  [bookings, settings.maxBookingsPerDay]
-);
-
-const updateSettings = useCallback(
-  (newSettings: Partial<AppSettings>) => {
-    if (!currentUser?.isAdmin) return false;
-
-    apiService.updateSettings(newSettings).catch(err => console.error(err));
-    setSettings({ ...settings, ...newSettings });
-    return true;
-  },
-  [currentUser, settings]
-);
-
-const getUserBookings = useCallback(
-  (userId: string): Booking[] => {
-    return bookings.filter((b) => String(b.userId) === String(userId));
-  },
-  [bookings]
-);
-
-const getPendingSwapRequests = useCallback((): SwapRequest[] => {
-  if (!currentUser) return [];
-  return swapRequests.filter(
-    (r) => r.status === 'pending' && (String(r.requesterId) === String(currentUser.id) || String(r.targetUserId) === String(currentUser.id))
+      apiService.respondToSwapRequest(requestId, approve).catch(err => console.error(err));
+      return success;
+    },
+    [currentUser]
   );
-}, [swapRequests, currentUser]);
 
-const blockDate = useCallback(
-  async (date: string): Promise<boolean> => {
-    if (!currentUser?.isAdmin) return false;
 
-    try {
-      await apiService.blockDate(date);
-      setSettings({ ...settings, blockedDates: [...settings.blockedDates, date] });
-      return true;
-    } catch (error) {
-      console.error('Erro ao bloquear data:', error);
-      return false;
-    }
-  },
-  [currentUser, settings]
-);
+  const getDayCapacity = useCallback(
+    (date: Date): DayCapacity => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayBookings = bookings.filter((b) => {
+        // Normalize both dates to YYYY-MM-DD format
+        const bookingDateStr = b.date.split('T')[0]; // Handle both '2025-11-17' and '2025-11-17T00:00:00.000Z'
+        const match = bookingDateStr === dateStr && (b.status === 'confirmed' || b.status === 'pending');
+        return match;
+      });
 
-const unblockDate = useCallback(
-  async (date: string): Promise<boolean> => {
-    if (!currentUser?.isAdmin) return false;
+      console.log(`getDayCapacity for ${dateStr}:`, {
+        totalBookings: bookings.length,
+        dayBookings: dayBookings.length,
+        capacity: settings.maxBookingsPerDay,
+        available: settings.maxBookingsPerDay - dayBookings.length,
+      });
 
-    try {
-      await apiService.unblockDate(date);
-      setSettings({ ...settings, blockedDates: settings.blockedDates.filter((d) => d !== date) });
-      return true;
-    } catch (error) {
-      console.error('Erro ao desbloquear data:', error);
-      return false;
-    }
-  },
-  [currentUser, settings]
-);
-
-const setAnnouncement = useCallback(
-  async (message: string): Promise<boolean> => {
-    if (!currentUser?.isAdmin) return false;
-
-    try {
-      await apiService.setAnnouncement(message);
-      const newAnnouncement = {
-        id: `a${Date.now()}`,
-        message,
-        createdAt: new Date().toISOString(),
-        active: true,
+      return {
+        date: dateStr,
+        bookings: dayBookings,
+        capacity: settings.maxBookingsPerDay,
+        available: settings.maxBookingsPerDay - dayBookings.length,
       };
-      setSettings({ ...settings, adminAnnouncement: newAnnouncement });
+    },
+    [bookings, settings.maxBookingsPerDay]
+  );
+
+
+  const updateSettings = useCallback(
+    (newSettings: Partial<AppSettings>) => {
+      if (!currentUser?.isAdmin) return false;
+
+      apiService.updateSettings(newSettings).catch(err => console.error(err));
+      setSettings({ ...settings, ...newSettings });
       return true;
-    } catch (error) {
-      console.error('Erro ao definir aviso:', error);
-      return false;
-    }
-  },
-  [currentUser, settings]
-);
+    },
+    [currentUser, settings]
+  );
 
-const clearAnnouncement = useCallback(
-  async (): Promise<boolean> => {
-    if (!currentUser?.isAdmin) return false;
+  const getUserBookings = useCallback(
+    (userId: string): Booking[] => {
+      return bookings.filter((b) => String(b.userId) === String(userId));
+    },
+    [bookings]
+  );
 
-    try {
-      await apiService.clearAnnouncement();
-      setSettings({ ...settings, adminAnnouncement: undefined });
-      return true;
-    } catch (error) {
-      console.error('Erro ao limpar aviso:', error);
-      return false;
-    }
-  },
-  [currentUser, settings]
-);
+  const getPendingSwapRequests = useCallback((): SwapRequest[] => {
+    if (!currentUser) return [];
+    return swapRequests.filter(
+      (r) =>
+        r.status === 'pending' &&
+        (String(r.requesterId) === String(currentUser.id) ||
+          String(r.targetUserId) === String(currentUser.id))
+    );
+  }, [swapRequests, currentUser]);
 
-const approveBooking = useCallback(
-  (bookingId: string): boolean => {
-    if (!currentUser?.isAdmin) {
-      console.log('Usuário não é admin');
-      return false;
-    }
+  const blockDate = useCallback(
+    async (date: string): Promise<boolean> => {
+      if (!currentUser?.isAdmin) return false;
 
-    console.log('Aprovando booking:', bookingId);
-    let success = false;
-
-    setBookings((prevBookings) => {
-      const booking = prevBookings.find((b) => b.id === bookingId);
-      if (!booking) {
-        console.log('Booking não encontrada:', bookingId);
-        return prevBookings;
+      try {
+        await apiService.blockDate(date);
+        setSettings({
+          ...settings,
+          blockedDates: [...settings.blockedDates, date],
+        });
+        return true;
+      } catch (error) {
+        console.error('Erro ao bloquear data:', error);
+        return false;
       }
+    },
+    [currentUser, settings]
+  );
 
-      console.log('Booking encontrada, atualizando status');
-      success = true;
-      return prevBookings.map((b) =>
-        b.id === bookingId ? { ...b, status: 'confirmed' as const, needsApproval: false } : b
-      );
-    });
+  const unblockDate = useCallback(
+    async (date: string): Promise<boolean> => {
+      if (!currentUser?.isAdmin) return false;
 
-    apiService.approveBooking(bookingId).catch(err => console.error(err));
-    console.log('Resultado da aprovação:', success);
-    return success;
-  },
-  [currentUser]
-);
-
-const rejectBooking = useCallback(
-  (bookingId: string): boolean => {
-    if (!currentUser?.isAdmin) {
-      console.log('Usuário não é admin');
-      return false;
-    }
-
-    console.log('Rejeitando booking:', bookingId);
-    let success = false;
-
-    setBookings((prevBookings) => {
-      const booking = prevBookings.find((b) => b.id === bookingId);
-      if (!booking) {
-        console.log('Booking não encontrada:', bookingId);
-        return prevBookings;
+      try {
+        await apiService.unblockDate(date);
+        setSettings({
+          ...settings,
+          blockedDates: settings.blockedDates.filter((d) => d !== date),
+        });
+        return true;
+      } catch (error) {
+        console.error('Erro ao desbloquear data:', error);
+        return false;
       }
+    },
+    [currentUser, settings]
+  );
 
-      console.log('Booking encontrada, removendo');
-      success = true;
-      return prevBookings.filter((b) => b.id !== bookingId);
-    });
+  const setAnnouncement = useCallback(
+    async (message: string): Promise<boolean> => {
+      if (!currentUser?.isAdmin) return false;
 
-    apiService.rejectBooking(bookingId).catch(err => console.error(err));
-    console.log('Resultado da rejeição:', success);
-    return success;
-  },
-  [currentUser]
-);
+      try {
+        const response = await apiService.setAnnouncement(message);
+        const newAnnouncement = {
+          id: String(response.id),
+          message,
+          createdAt: new Date().toISOString(),
+          active: true,
+        };
+        setSettings({ ...settings, adminAnnouncement: newAnnouncement });
+        return true;
+      } catch (error) {
+        console.error('Erro ao definir aviso:', error);
+        return false;
+      }
+    },
+    [currentUser, settings]
+  );
 
-const getUserStats = useCallback(
-  (userId: string): UserStats => {
-    const userBookings = bookings.filter((b) => String(b.userId) === String(userId));
-    const userSwapsRequested = swapRequests.filter((s) => String(s.requesterId) === String(userId));
-    const userSwapsReceived = swapRequests.filter((s) => String(s.targetUserId) === String(userId));
+  const clearAnnouncement = useCallback(
+    async (): Promise<boolean> => {
+      if (!currentUser?.isAdmin) return false;
 
-    return {
-      userId,
-      totalBookings: userBookings.length,
-      confirmedBookings: userBookings.filter((b) => b.status === 'confirmed').length,
-      pendingBookings: userBookings.filter((b) => b.status === 'pending').length,
-      cancelledBookings: userBookings.filter((b) => b.status === 'cancelled').length,
-      swapsRequested: userSwapsRequested.length,
-      swapsReceived: userSwapsReceived.length,
-      swapsApproved: userSwapsRequested.filter((s) => s.status === 'approved').length,
-      swapsRejected: userSwapsRequested.filter((s) => s.status === 'rejected').length,
-    };
-  },
-  [bookings, swapRequests]
-);
+      try {
+        await apiService.clearAnnouncement();
+        setSettings({ ...settings, adminAnnouncement: undefined });
+        return true;
+      } catch (error) {
+        console.error('Erro ao limpar aviso:', error);
+        return false;
+      }
+    },
+    [currentUser, settings]
+  );
 
-const getPendingBookings = useCallback((): Booking[] => {
-  return bookings.filter((b) => b.status === 'pending');
-}, [bookings]);
+  const approveBooking = useCallback(
+    (bookingId: string): boolean => {
+      if (!currentUser?.isAdmin) return false;
 
-return useMemo(
-  () => ({
-    currentUser,
-    users,
-    bookings,
-    swapRequests,
-    settings,
-    isLoading,
-    login,
-    signup,
-    logout,
-    updateUser,
-    createBooking,
-    cancelBooking,
-    createSwapRequest,
-    cancelSwapRequest,
-    respondToSwapRequest,
-    getDayCapacity,
-    updateSettings,
-    getUserBookings,
-    getPendingSwapRequests,
-    blockDate,
-    unblockDate,
-    setAnnouncement,
-    clearAnnouncement,
-    approveBooking,
-    rejectBooking,
-    getUserStats,
-    getPendingBookings,
-    getUserWeekBookingsCount,
-  }),
-  [
-    currentUser,
-    users,
-    bookings,
-    swapRequests,
-    settings,
-    isLoading,
-    login,
-    signup,
-    logout,
-    updateUser,
-    createBooking,
-    cancelBooking,
-    createSwapRequest,
-    cancelSwapRequest,
-    respondToSwapRequest,
-    getDayCapacity,
-    updateSettings,
-    getUserBookings,
-    getPendingSwapRequests,
-    blockDate,
-    unblockDate,
-    setAnnouncement,
-    clearAnnouncement,
-    approveBooking,
-    rejectBooking,
-    getUserStats,
-    getPendingBookings,
-    getUserWeekBookingsCount,
-  ]
-);
+      let success = false;
+
+      setBookings((prevBookings) => {
+        const booking = prevBookings.find((b) => b.id === bookingId);
+        if (!booking) return prevBookings;
+
+        success = true;
+        return prevBookings.map((b) =>
+          b.id === bookingId
+            ? { ...b, status: 'confirmed', needsApproval: false }
+            : b
+        );
+      });
+
+      apiService.approveBooking(bookingId).catch(err => console.error(err));
+      return success;
+    },
+    [currentUser]
+  );
+
+  const rejectBooking = useCallback(
+    (bookingId: string): boolean => {
+      if (!currentUser?.isAdmin) return false;
+
+      let success = false;
+
+      setBookings((prevBookings) => {
+        const booking = prevBookings.find((b) => b.id === bookingId);
+        if (!booking) return prevBookings;
+
+        success = true;
+        return prevBookings.filter((b) => b.id !== bookingId);
+      });
+
+      apiService.rejectBooking(bookingId).catch(err => console.error(err));
+      return success;
+    },
+    [currentUser]
+  );
+
+  const getUserStats = useCallback(
+    (userId: string): UserStats => {
+      const userBookings = bookings.filter((b) => String(b.userId) === String(userId));
+      const userSwapsRequested = swapRequests.filter((s) => String(s.requesterId) === String(userId));
+      const userSwapsReceived = swapRequests.filter((s) => String(s.targetUserId) === String(userId));
+
+      return {
+        userId,
+        totalBookings: userBookings.length,
+        confirmedBookings: userBookings.filter((b) => b.status === 'confirmed').length,
+        pendingBookings: userBookings.filter((b) => b.status === 'pending').length,
+        cancelledBookings: userBookings.filter((b) => b.status === 'cancelled').length,
+        swapsRequested: userSwapsRequested.length,
+        swapsReceived: userSwapsReceived.length,
+        swapsApproved: userSwapsRequested.filter((s) => s.status === 'approved').length,
+        swapsRejected: userSwapsRequested.filter((s) => s.status === 'rejected').length,
+      };
+    },
+    [bookings, swapRequests]
+  );
+
+  const getPendingBookings = useCallback((): Booking[] => {
+    return bookings.filter((b) => b.status === 'pending');
+  }, [bookings]);
+
+  return useMemo(
+    () => ({
+      currentUser,
+      users,
+      bookings,
+      swapRequests,
+      settings,
+      isLoading,
+      login,
+      signup,
+      logout,
+      updateUser,
+      createBooking,
+      cancelBooking,
+      createSwapRequest,
+      cancelSwapRequest,
+      respondToSwapRequest,
+      getDayCapacity,
+      updateSettings,
+      getUserBookings,
+      getPendingSwapRequests,
+      blockDate,
+      unblockDate,
+      setAnnouncement,
+      clearAnnouncement,
+      approveBooking,
+      rejectBooking,
+      getUserStats,
+      getPendingBookings,
+      getUserWeekBookingsCount,
+    }),
+    [
+      currentUser,
+      users,
+      bookings,
+      swapRequests,
+      settings,
+      isLoading,
+      login,
+      signup,
+      logout,
+      updateUser,
+      createBooking,
+      cancelBooking,
+      createSwapRequest,
+      cancelSwapRequest,
+      respondToSwapRequest,
+      getDayCapacity,
+      updateSettings,
+      getUserBookings,
+      getPendingSwapRequests,
+      blockDate,
+      unblockDate,
+      setAnnouncement,
+      clearAnnouncement,
+      approveBooking,
+      rejectBooking,
+      getUserStats,
+      getPendingBookings,
+      getUserWeekBookingsCount,
+    ]
+  );
 });

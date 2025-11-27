@@ -25,8 +25,8 @@ export default function AuthScreen() {
   const { showToast } = useToast();
 
   const [mode, setMode] = useState<AuthMode>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('ana.silva@company.com');
+  const [password, setPassword] = useState('123456');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 

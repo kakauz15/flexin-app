@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db';
 import { appSettings, blockedDates, adminAnnouncements } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 
 const app = new Hono();
 
@@ -45,12 +45,10 @@ app.post('/blocked-dates', async (c) => {
 
 // Unblock a date
 app.delete('/blocked-dates/:date', async (c) => {
-    const dateStr = c.req.param('date');
-    // Drizzle date column expects a string in YYYY-MM-DD format or a Date object.
-    // Since we are comparing, we should ensure it matches the DB format.
-    // Using sql template might be safer or just passing the string if the driver handles it.
-    // The error suggests type mismatch. Let's try casting to any or using sql.
-    await db.delete(blockedDates).where(eq(blockedDates.date, dateStr as any));
+    const dateParam = c.req.param('date');
+    // Extract YYYY-MM-DD from the date parameter (handles both ISO and simple formats)
+    const dateStr = dateParam.split('T')[0];
+    await db.delete(blockedDates).where(sql`${blockedDates.date} = ${dateStr}`);
     return c.json({ message: 'Date unblocked' });
 });
 
