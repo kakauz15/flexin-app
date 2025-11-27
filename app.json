@@ -22,8 +22,8 @@
       "bundleIdentifier": "com.flexin.scheduler"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+      "adaptativeIcon": {
+        "foregroundImage": "./assets/images/adaptative-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.flexin.scheduler"

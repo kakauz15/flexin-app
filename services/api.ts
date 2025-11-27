@@ -1,7 +1,9 @@
 import { User, Booking, SwapRequest, AppSettings, AdminAnnouncement } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.15.4:3001';
+
+console.log("API URL =>", API_URL);
 
 const getHeaders = async () => {
     const token = await AsyncStorage.getItem('token');
@@ -41,29 +43,29 @@ const mapUser = (data: any): User => ({
 
 const mapBooking = (data: any): Booking => ({
     id: String(data.id),
-    userId: String(data.user_id), // Map user_id to userId
+    userId: String(data.userId || data.user_id),
     date: data.date,
     status: data.status,
-    createdAt: data.created_at, // Map created_at to createdAt
-    needsApproval: data.needs_approval, // Map needs_approval to needsApproval
+    createdAt: data.createdAt || data.created_at,
+    needsApproval: data.needsApproval !== undefined ? data.needsApproval : data.needs_approval,
 });
 
 const mapSwapRequest = (data: any): SwapRequest => ({
     id: String(data.id),
-    requesterId: String(data.requester_id), // Map requester_id
-    targetUserId: String(data.target_user_id), // Map target_user_id
-    requesterDate: data.requester_date, // Map requester_date
-    targetDate: data.target_date, // Map target_date
+    requesterId: String(data.requesterId || data.requester_id),
+    targetUserId: String(data.targetUserId || data.target_user_id),
+    requesterDate: data.requesterDate || data.requester_date,
+    targetDate: data.targetDate || data.target_date,
     status: data.status,
     message: data.message,
-    createdAt: data.created_at, // Map created_at
-    updatedAt: data.updated_at, // Map updated_at
+    createdAt: data.createdAt || data.created_at,
+    updatedAt: data.updatedAt || data.updated_at,
 });
 
 const mapAnnouncement = (data: any): AdminAnnouncement => ({
     id: String(data.id),
     message: data.message,
-    createdAt: data.created_at, // Map created_at
+    createdAt: data.createdAt || data.created_at,
     active: !!data.active,
 });
 
