@@ -1,10 +1,10 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { useFlexIN } from '@/context/FlexINContext';
-import UserSwapRequestsScreen from '@/screens/UserSwapRequestsScreen';
+import UserDayRequestsScreen from '@/screens/UserDayRequestsScreen';
 import AdminApprovalRequestsScreen from '@/screens/AdminApprovalRequestsScreen';
 
-export default function SwapRequestsScreen() {
+export default function DayRequestsScreen() {
   const { currentUser } = useFlexIN();
 
   return (
@@ -14,7 +14,7 @@ export default function SwapRequestsScreen() {
           title: 'Solicitações',
         }}
       />
-      {currentUser?.isAdmin ? <AdminApprovalRequestsScreen /> : <UserSwapRequestsScreen />}
+      {currentUser?.isAdmin ? <AdminApprovalRequestsScreen /> : <UserDayRequestsScreen />}
     </>
   );
 }

@@ -78,7 +78,22 @@ export default function BookingScreen() {
 
       // Check if day is full BEFORE attempting to create booking
       if (dayCapacity.available === 0 && dayCapacity.bookings.length > 0) {
-        console.log('Dia cheio, abrindo modal de troca');
+        console.log('Dia cheio, verificando limite de marcações do usuário');
+
+        // Validate booking limit before showing swap modal
+        const userBookings = getDayCapacity(startOfToday()).bookings.filter(
+          (b) => String(b.userId) === String(currentUser.id)
+        );
+
+        if (userBookings.length >= 2) {
+          showToast({
+            message: 'Você já atingiu o limite de marcações. Cancele uma marcação existente antes de solicitar um novo dia.',
+            type: 'error',
+          });
+          return;
+        }
+
+        console.log('Abrindo modal de solicitação de dia');
         setSelectedDate(date);
         setShowSwapModal(true);
         return;
@@ -110,11 +125,11 @@ export default function BookingScreen() {
     if (!currentUser || !selectedDate || !selectedTargetUserId) return;
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const success = await createSwapRequest(selectedTargetUserId, dateStr, dateStr, swapJustification);
+    const success = await createSwapRequest(selectedTargetUserId, dateStr, swapJustification);
 
     if (success) {
       showToast({
-        message: 'Solicitação de troca enviada com sucesso!',
+        message: 'Solicitação enviada com sucesso!',
         type: 'success',
       });
       setShowSwapModal(false);
@@ -123,7 +138,7 @@ export default function BookingScreen() {
       setSwapJustification('');
     } else {
       showToast({
-        message: 'Não foi possível enviar a solicitação de troca.',
+        message: 'Não foi possível enviar a solicitação. Verifique se você não atingiu o limite de marcações.',
         type: 'error',
       });
     }
@@ -254,7 +269,7 @@ export default function BookingScreen() {
         <View style={styles.swapModalOverlay}>
           <View style={styles.swapModalContent}>
             <View style={styles.swapModalHeader}>
-              <Text style={styles.swapModalTitle}>Solicitar Troca</Text>
+              <Text style={styles.swapModalTitle}>Solicitar Dia</Text>
               <TouchableOpacity onPress={handleCloseSwapModal} style={styles.closeButton}>
                 <X size={24} color={theme.colors.text} />
               </TouchableOpacity>
@@ -264,7 +279,7 @@ export default function BookingScreen() {
               {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
             </Text>
 
-            <Text style={styles.swapModalLabel}>Escolha com quem deseja trocar:</Text>
+            <Text style={styles.swapModalLabel}>Escolha de quem você quer o dia:</Text>
 
             <ScrollView style={styles.userList} showsVerticalScrollIndicator={false}>
               {bookedUsers.length === 0 ? (
@@ -306,7 +321,7 @@ export default function BookingScreen() {
             />
 
             <Button
-              title="Solicitar troca"
+              title="Solicitar dia"
               onPress={handleSwapRequest}
               fullWidth
               disabled={!selectedTargetUserId}

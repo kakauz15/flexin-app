@@ -210,14 +210,20 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
    * CREATE SWAP REQUEST
    */
   const createSwapRequest = useCallback(
-    async (targetUserId: string, requesterDate: string, targetDate: string, message?: string): Promise<boolean> => {
+    async (targetUserId: string, targetDate: string, message?: string): Promise<boolean> => {
       if (!currentUser) return false;
+
+      // Validate booking limit
+      const userBookings = bookings.filter((b) => String(b.userId) === String(currentUser.id));
+      if (userBookings.length >= 2) {
+        console.error('Usuário já atingiu o limite de marcações');
+        return false;
+      }
 
       try {
         const response = await apiService.createSwapRequest({
           requesterId: currentUser.id,
           targetUserId,
-          requesterDate,
           targetDate,
           status: 'pending',
           message,
@@ -227,7 +233,7 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
           id: String(response.id),
           requesterId: currentUser.id,
           targetUserId,
-          requesterDate,
+          requesterDate: '', // No longer used
           targetDate,
           status: 'pending',
           message,
@@ -242,7 +248,7 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
         return false;
       }
     },
-    [currentUser]
+    [currentUser, bookings]
   );
 
   const cancelSwapRequest = useCallback(
@@ -286,21 +292,18 @@ export const [FlexINContext, useFlexIN] = createContextHook(() => {
         success = true;
 
         if (approve) {
+          // Transfer booking from target to requester
           setBookings((prevBookings) => {
-            const requesterBooking = prevBookings.find(
-              (b) => String(b.userId) === String(request.requesterId) && b.date === request.requesterDate
-            );
             const targetBooking = prevBookings.find(
               (b) => String(b.userId) === String(request.targetUserId) && b.date === request.targetDate
             );
 
-            if (!requesterBooking || !targetBooking) return prevBookings;
+            if (!targetBooking) return prevBookings;
 
+            // Transfer ownership: change userId to requester
             return prevBookings.map((b) => {
-              if (b.id === requesterBooking.id)
-                return { ...b, date: request.targetDate };
               if (b.id === targetBooking.id)
-                return { ...b, date: request.requesterDate };
+                return { ...b, userId: request.requesterId };
               return b;
             });
           });

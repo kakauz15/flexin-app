@@ -5,7 +5,7 @@ import authRoutes from "./routes/auth";
 import usersRoutes from "./routes/users";
 import departmentsRoutes from "./routes/departments";
 import bookingsRoutes from "./routes/bookings";
-import swapRequestsRoutes from "./routes/swap-requests";
+import swapRequestsRoutes from "./routes/day-requests";
 import settingsRoutes from "./routes/settings";
 
 const app = new Hono();

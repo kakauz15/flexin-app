@@ -11,30 +11,30 @@ import { theme } from '@/constants/theme';
 import { useFlexIN } from '@/context/FlexINContext';
 import { useToast } from '@/components/Toast';
 
-export default function UserSwapRequestsScreen() {
-  const { 
-    currentUser, 
-    users, 
-    swapRequests, 
+export default function UserDayRequestsScreen() {
+  const {
+    currentUser,
+    users,
+    swapRequests,
     respondToSwapRequest,
     cancelSwapRequest,
   } = useFlexIN();
-  
+
   const { showToast } = useToast();
 
   console.log('=== USER SWAP REQUESTS SCREEN DEBUG ===');
   console.log('Current User:', currentUser?.id, currentUser?.name);
   console.log('All Swap Requests:', swapRequests.length, swapRequests);
-  
+
   const mySwapRequests = swapRequests.filter(
     (r) => String(r.requesterId) === String(currentUser?.id) || String(r.targetUserId) === String(currentUser?.id)
   );
-  
+
   console.log('My Swap Requests:', mySwapRequests.length, mySwapRequests);
 
   const pendingSwaps = mySwapRequests.filter(r => r.status === 'pending');
   const completedSwaps = mySwapRequests.filter(r => r.status !== 'pending');
-  
+
   console.log('Pending Swaps:', pendingSwaps.length);
   console.log('Completed Swaps:', completedSwaps.length);
   console.log('=== END DEBUG ===');
@@ -104,7 +104,7 @@ export default function UserSwapRequestsScreen() {
     const requester = users.find((u) => String(u.id) === String(request.requesterId));
     const target = users.find((u) => String(u.id) === String(request.targetUserId));
     const isRequester = String(request.requesterId) === String(currentUser?.id);
-    
+
     if (!requester || !target) {
       console.log('Usuário não encontrado para solicitação:', request.id);
       return null;
@@ -131,14 +131,7 @@ export default function UserSwapRequestsScreen() {
 
           <View style={styles.dateRow}>
             <View style={styles.dateItem}>
-              <Text style={styles.dateLabel}>{isRequester ? 'Seu dia' : 'Dia dele(a)'}</Text>
-              <Text style={styles.dateValue}>
-                {format(parseISO(request.requesterDate), "d 'de' MMM", { locale: ptBR })}
-              </Text>
-            </View>
-            <ArrowLeftRight size={16} color={theme.colors.primary} />
-            <View style={styles.dateItem}>
-              <Text style={styles.dateLabel}>{isRequester ? 'Dia dele(a)' : 'Seu dia'}</Text>
+              <Text style={styles.dateLabel}>{isRequester ? 'Dia solicitado' : 'Seu dia'}</Text>
               <Text style={styles.dateValue}>
                 {format(parseISO(request.targetDate), "d 'de' MMM", { locale: ptBR })}
               </Text>
@@ -203,7 +196,7 @@ export default function UserSwapRequestsScreen() {
             <ArrowLeftRight size={64} color={theme.colors.textLight} strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>Nenhuma solicitação</Text>
             <Text style={styles.emptyText}>
-              Quando dias estiverem cheios, você poderá solicitar trocas com colegas
+              Quando você precisar de um dia que está cheio, poderá solicitar o dia de um colega
             </Text>
           </View>
         ) : (

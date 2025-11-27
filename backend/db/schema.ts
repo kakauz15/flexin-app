@@ -38,7 +38,7 @@ export const swapRequests = mysqlTable('swap_requests', {
   id: serial('id').primaryKey(),
   requesterId: bigint('requester_id', { mode: 'number', unsigned: true }).notNull().references(() => users.id),
   targetUserId: bigint('target_user_id', { mode: 'number', unsigned: true }).notNull().references(() => users.id),
-  requesterDate: date('requester_date').notNull(),
+  requesterDate: date('requester_date'),
   targetDate: date('target_date').notNull(),
   status: mysqlEnum('status', ['pending', 'approved', 'rejected']).notNull().default('pending'),
   message: text('message'),

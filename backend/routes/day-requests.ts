@@ -14,12 +14,23 @@ app.get('/', async (c) => {
 // Create a swap request
 app.post('/', async (c) => {
     const body = await c.req.json();
-    const { requesterId, targetUserId, requesterDate, targetDate, message } = body;
+    const { requesterId, targetUserId, targetDate, message } = body;
+
+    // Validate requester's booking count
+    const requesterBookings = await db.select()
+        .from(bookings)
+        .where(eq(bookings.userId, requesterId));
+
+    if (requesterBookings.length >= 2) {
+        return c.json({
+            error: 'Você já atingiu o limite de marcações. Cancele uma marcação existente antes de solicitar um novo dia.'
+        }, 400);
+    }
 
     const [result] = await db.insert(swapRequests).values({
         requesterId,
         targetUserId,
-        requesterDate,
+        requesterDate: null, // No longer required
         targetDate,
         message,
         status: 'pending'
@@ -41,7 +52,7 @@ app.patch('/:id/respond', async (c) => {
     const { approve } = await c.req.json();
 
     if (approve) {
-        // Transaction to update swap request and swap bookings
+        // Transaction to update swap request and transfer booking
         await db.transaction(async (tx) => {
             const [request] = await tx.select().from(swapRequests).where(eq(swapRequests.id, id));
 
@@ -52,16 +63,8 @@ app.patch('/:id/respond', async (c) => {
                 .set({ status: 'approved' })
                 .where(eq(swapRequests.id, id));
 
-            // Swap bookings dates
-            // Find requester booking
-            const [requesterBooking] = await tx.select().from(bookings).where(
-                and(
-                    eq(bookings.userId, request.requesterId),
-                    eq(bookings.date, request.requesterDate)
-                )
-            );
-
-            // Find target booking
+            // Transfer booking from target to requester
+            // Find target user's booking for the requested date
             const [targetBooking] = await tx.select().from(bookings).where(
                 and(
                     eq(bookings.userId, request.targetUserId),
@@ -69,17 +72,14 @@ app.patch('/:id/respond', async (c) => {
                 )
             );
 
-            if (requesterBooking && targetBooking) {
+            if (targetBooking) {
+                // Transfer ownership: update userId to requester
                 await tx.update(bookings)
-                    .set({ date: request.targetDate })
-                    .where(eq(bookings.id, requesterBooking.id));
-
-                await tx.update(bookings)
-                    .set({ date: request.requesterDate })
+                    .set({ userId: request.requesterId })
                     .where(eq(bookings.id, targetBooking.id));
             }
         });
-        return c.json({ message: 'Swap request approved and bookings swapped' });
+        return c.json({ message: 'Swap request approved and booking transferred' });
     } else {
         await db.update(swapRequests)
             .set({ status: 'rejected' })
