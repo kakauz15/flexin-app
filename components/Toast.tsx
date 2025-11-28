@@ -71,32 +71,32 @@ export const [ToastProvider, useToast] = createContextHook<ToastContextValue>(()
   };
 
   const ToastContainer = useCallback(() => {
-      if (!visible || !config) return null;
+    if (!visible || !config) return null;
 
-      const toastStyle = getToastStyle(config.type);
+    const toastStyle = getToastStyle(config.type);
 
-      return (
-        <Animated.View
-          style={[
-            styles.toastContainer,
-            {
-              opacity: fadeAnim,
-              transform: [
-                {
-                  translateY: fadeAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [100, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.toast, { backgroundColor: toastStyle.backgroundColor }]}>
-            <Text style={[styles.toastText, { color: toastStyle.color }]}>{config.message}</Text>
-          </View>
-        </Animated.View>
-      );
+    return (
+      <Animated.View
+        style={[
+          styles.toastContainer,
+          {
+            opacity: fadeAnim,
+            transform: [
+              {
+                translateY: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [100, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={[styles.toast, { backgroundColor: toastStyle.backgroundColor }]}>
+          <Text style={[styles.toastText, { color: toastStyle.color }]}>{config.message}</Text>
+        </View>
+      </Animated.View>
+    );
   }, [visible, config, fadeAnim]);
 
   return React.useMemo(() => ({

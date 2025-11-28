@@ -14,7 +14,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { currentUser, logout, getUserBookings, updateUser } = useFlexIN();
   const { showToast } = useToast();
-  
+
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');

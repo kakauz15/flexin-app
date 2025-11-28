@@ -425,7 +425,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   bookedCard: {
-    backgroundColor: `${theme.colors.primary}08`,
+    // backgroundColor: `${theme.colors.primary}08`,
+    borderColor: theme.colors.primary,
+    borderWidth: 2,
   },
   dayHeader: {
     flexDirection: 'row',
@@ -515,8 +517,10 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     marginTop: theme.spacing.lg,
-    backgroundColor: `${theme.colors.info}10`,
-    borderColor: theme.colors.info,
+    // backgroundColor: `${theme.colors.info}10`,
+    backgroundColor: `${theme.colors.primaryLight}`,
+    borderColor: theme.colors.primaryDark,
+    borderWidth: 1,
   },
   infoTitle: {
     fontSize: theme.fontSize.md,
@@ -548,7 +552,8 @@ const styles = StyleSheet.create({
   },
   announcementCard: {
     marginBottom: theme.spacing.lg,
-    backgroundColor: `${theme.colors.info}10`,
+    // backgroundColor: `${theme.colors.info}10`,
+    backgroundColor: `${theme.colors.primaryLight}`,
     borderColor: theme.colors.info,
     borderWidth: 1,
   },
